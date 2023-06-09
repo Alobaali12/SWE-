@@ -1,2 +1,2 @@
 # SWE-
-Welding Environment Simulator
+ Simulated Welding Environment
