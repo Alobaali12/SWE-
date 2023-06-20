@@ -9,8 +9,8 @@
 #define PIN_CNTRL 2 // Controls N-Channel MOSFETs Gate Switching
 #define BAUD_RATE 115200 // Serial Baud rate
 /* Set the delay between fresh samples */
-#define BUFFER_SIZE 10       // nth Order velocity buffer
-#define BNO055_SAMPLERATE_DELAY_MS (100) // Ask Carlos ???
+#define BUFFER_SIZE 5       // nth Order velocity buffer
+#define BNO055_SAMPLERATE_DELAY_MS (10) // Ask Carlos ???
 #define NUM_DIST_SENSORS_SIZE 2
 #define PIN_ANALOG_IN A0
 #define FILTER_READINGS 1 // Applies a Low pass filter for displacement data, and a FIFO running average smoothing for velocity data.
@@ -66,7 +66,7 @@ class Velocity_FIFO {
     
     if (elapsedTime >= SAMPLE_INTERVAL) {
       // Calculate velocity using differentiation
-      float velocity = (currentDisplacement - previousDisplacement) / (elapsedTime / 1000.0);
+      float velocity = (currentDisplacement - previousDisplacement) / (elapsedTime/1000.00); // in mm/sec
       
       // Filter the velocity to reduce noise
       filteredVelocity = (VELOCITY_FILTER * velocity) + ((1 - VELOCITY_FILTER) * filteredVelocity);
@@ -84,7 +84,7 @@ private:
     float Velocity_Buffer[BUFFER_SIZE];
     int currentIndex = 0;
     int itemCount = 0;
-    const float VELOCITY_FILTER = 0.3;         // Velocity filtering factor
+    const float VELOCITY_FILTER = 0.6;         // Velocity filtering factor
     unsigned long previousTime = 0;
     float previousDisplacement = 0;
     float filteredVelocity = 0;
@@ -283,7 +283,7 @@ void SET_I2C_ADDRESS(SFEVL53L1X* distanceSensor,int Address)
 void Send_Data_To_Port(void)
 {
   Auto_Calibrate();
-  Serial.print(millis());
+  Serial.print((float) millis()/1000, 3); // time in seconds
   Serial.print(", ");
   Serial.print(Get_Pitch());
   Serial.print(", ");
@@ -293,7 +293,11 @@ void Send_Data_To_Port(void)
   Serial.print(", ");
   Serial.print(Get_CTWD());
   Serial.print(", ");
-  Serial.println(Get_HD());
+  Serial.print(Get_HD());
+  Serial.print(", ");
+  Serial.print(Get_H_Velocity(Get_HD()),4);
+  Serial.print(", ");
+  Serial.println(Get_Sound());
   delay(BNO055_SAMPLERATE_DELAY_MS);
 }
 
@@ -370,7 +374,7 @@ void Init_Distance_Sensor(SFEVL53L1X* distanceSensor, int Sens_num)
 
 void Print_Excel_Columns(void)
 {
-  Serial.println("Time,Pitch,Roll,Yaw,CTWD,HD");
+  Serial.println("Time,Pitch,Roll,Yaw,CTWD,HD,HV,Mic");
 }
 // Carlos function
 void Read_Serial(void)
@@ -442,8 +446,8 @@ void Init_timer(unsigned long timer)
   // initialize the pushbutton pin as an input:
 void Init_Button(int buttonPin)
 {
-  pinMode(buttonPin, INPUT);
-  digitalWrite(buttonPin, HIGH);
+  pinMode(buttonPin, INPUT_PULLUP);
+ // digitalWrite(buttonPin, HIGH);
  // attachInterrupt(digitalPinToInterrupt(buttonPin), Auto_Calibrate, FALLING);
 }
 
