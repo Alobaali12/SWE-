@@ -11,7 +11,7 @@ ser = serial.Serial(serial_port, baud_rate)
 # Create a CSV file to write the data
 csv_file = open('data.csv', 'w', newline='')
 csv_writer = csv.writer(csv_file)
-csv_writer.writerow(['Time', 'Pitch', 'Yaw', 'Roll', 'CTWD', 'HD','HV','Mic'])
+csv_writer.writerow(['Time', 'Pitch (WA)', 'Yaw (TA)', 'Roll', 'CTWD', 'HD','HV','Mic']) # Where WA: Wprking Angle, TA: Travel Angle
 
 # Read and process the data from the serial port
 while True:
