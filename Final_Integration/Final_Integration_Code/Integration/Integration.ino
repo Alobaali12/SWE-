@@ -339,7 +339,7 @@ float Get_H_Velocity(float displacement); // Horizontal velocity
 void IMU_Calibration(Adafruit_BNO055& bno);
 void Print_Calibration_Data(Adafruit_BNO055& bno);
 void FLASH_LED(int LED);
-void Auto_Calibrate(void);
+bool Auto_Calibrate(void);
 void Read_Serial(void);
 void Print_Excel_Columns(void);
 void Get_Calibration_Data(void);
@@ -467,7 +467,7 @@ void Debug_System(void)
 {
   Auto_Calibrate();
   Serial.print("Time: ");
-  Serial.println(millis()); // Time in milli seconds
+  Serial.print((float) millis()/1000, 3); // time in seconds
   Serial.print("IMU Data: ");
   IMU.PrintIMUData();
   Serial.println();
@@ -657,13 +657,14 @@ void FLASH_LED(int LED)
   delay(50);
 }
 
-void Auto_Calibrate(void)
+bool Auto_Calibrate(void)
 {
  // (DEBUG_MODE) ? Serial.println("Button Interrupt Handler Accessed.") : 0;
   if(!digitalRead(BUTTON_PIN))
   {
-      if((millis() - lastDebounceTime) > debounceDelay)
+    if((millis() - lastDebounceTime) > debounceDelay)
     {
+      digitalWrite(WHITE_LED, HIGH); // Light up LED.
       (DEBUG_MODE) ? Serial.println("Button was pressed, starting data calibration") : 0;
       Calibration.offsetOrientation = IMU.Get_Quaternions().conjugate(); // offset orientation is caluclated as the conjugate of current quaternion to perform correct rotation offsetting later.
       // Calibration sequence
@@ -675,11 +676,16 @@ void Auto_Calibrate(void)
       */
       Calibration.Pitch_Calibration = IMU.GetRawPitch();
       Calibration.Yaw_Calibration = IMU.GetRawYaw();
-      Calibration.Roll_Calibration = IMU.GetRawRoll();
-    
+      Calibration.Roll_Calibration = IMU.GetRawRoll(); 
+
+      lastDebounceTime = millis();  
+      digitalWrite(WHITE_LED, LOW); // LED off, Calibration completed. 
+
+      return true; // button pressed successfully (IMU Calibrated).
     }
-  lastDebounceTime = millis();  
+      lastDebounceTime = millis();  
   }
+  return false; // Either button not pressed or still debouncing.
 
 }
 
@@ -712,10 +718,9 @@ void Init_BNO055(Adafruit_BNO055& bno)
     // Look for LED solid white light, means ready to start
     digitalWrite(WHITE_LED, HIGH);
     delay(START_DELAY);
-    while(digitalRead(BUTTON_PIN)) Auto_Calibrate(); // wait until button is pressed then flash LED
+    while(!Auto_Calibrate()); // wait until button is pressed then flash LED
     digitalWrite(WHITE_LED, LOW); // ready to start
   }
-
 
 }
 
