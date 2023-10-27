@@ -449,6 +449,7 @@ void Send_Data_To_Port(void)
   Auto_Calibrate();
   Serial.print((float) millis()/1000, 3); // time in seconds
   Serial.print(", ");
+  TCA9548A(BNO055_MULTIPLEXER_PIN); // look up for IMU first.
   IMU.PrintIMUData();
   Serial.print(", ");
   Serial.print(Get_CTWD());
