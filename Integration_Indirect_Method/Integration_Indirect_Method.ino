@@ -24,16 +24,13 @@
 #define TCA9548A_ADDRESS 0x70  // TCA9548A multiplexer address (adjust as needed)
 #define ServoAngle_Compensator -13  // Adjust the inial angle of the servo
 #define distance0_Compensator 18 //[mm] adjust the distance due to the mounting of the sensor  
-#define distance1_Compensator 15 //[mm] adjust the distance due to the mounting of the sensor  
+#define distance1_Compensator 15 //[mm] adjust the distance due to the mounting of the sensor
+#define SERVO_PIN 9  
 
-Servo servoMotor;
-float IMU_Angle = 0.00;
-float Working_Angle = 0.00;
-float CTWD = 0.00;
 
 // TCA9548A multiplexer 
 void TCA9548A(uint8_t bus){
-  if (bus > 7) return;
+  if (bus > 7) return; // Multiplexer maximum ports: 8 aka starting from 0.
   Wire.beginTransmission(TCA9548A_ADDRESS);  // TCA9548A address is 0x70
   Wire.write(1 << bus);          // send byte to select bus
   Wire.endTransmission();
@@ -288,15 +285,24 @@ class EMA_Filter // Exponential Moving Average filter, eliminates high frequency
 // -------------------------------------- System Objects --------------------------------------- //  
 Adafruit_BNO055 bno = Adafruit_BNO055(-1, 0x28, &Wire); /// IMU
 IMU_DATA IMU(bno); // Easy IMU data access
+
+// -------------------------------------- Distance Sensors --------------------------------------- //  
 /*  1: [CTWD: Distance between nozel tip and weldbead "Along the nozel direction !!!" ]
     2: [HD: Horizontal distance for velocity measurements]
 */
+
 SFEVL53L1X DIST_SENSORS[NUM_DIST_SENSORS_SIZE]; // Create an array to store the VL53L4CD sensor objects
 EMA_Filter DIST_FILTER[NUM_DIST_SENSORS_SIZE];
 
 Velocity_FIFO Sensor_Velocity; // Velocity Object, horizontal velcoity "Differentiation of displacement signal"
 
 int DISTANCE[NUM_DIST_SENSORS_SIZE];  // Create an array of integers distances
+
+// -------------------------------------- Servo --------------------------------------- //  
+Servo servoMotor;
+float IMU_Angle = 0.00;
+float Working_Angle = 0.00;
+float CTWD = 0.00;
 
 // -------------------------------------- Button Debouncing --------------------------------------- //  
 unsigned long debounceDelay = 200;
@@ -335,6 +341,7 @@ void Init_I2C(void); // Using default pins A4 (SDA) amd A5 (SCL)
 void Init_All_Dist_Sensors(void);
 void Init_Button(int buttonPin); // Sets Digital pin as Input held at Vcc rail.
 void Init_Cali_LED(int LED); // Initalizing Calibration LED indicator
+void Init_Servo(void);
 void Init_timer(unsigned long timer); // Carlos timer intialization
 void Init_Sound_Detector(void);
 int Get_Sound(void); // Currently configured to return analog data from pin A0.
@@ -446,9 +453,9 @@ void Send_Data_To_Port(void)
   Serial.print(", ");
   Serial.print(Get_CTWD());
   Serial.print(", ");
-  Serial.print(Get_HD());
+  Serial.print(Get_HD()); // Bug !!! only works if Get_CTWD is called first.
   Serial.print(", ");
-  Serial.print(Get_H_Velocity(Get_HD()),4);
+  Serial.print(Get_H_Velocity(Get_HD()),4); // bug delta T
   Serial.print(", ");
   Serial.println(Get_Sound());
   delay(BNO055_SAMPLERATE_DELAY_MS);
@@ -460,14 +467,15 @@ void Debug_System(void)
   Serial.print("Time: ");
   Serial.println(millis()); // Time in milli seconds
   Serial.print("IMU Data: ");
+  TCA9548A(BNO055_MULTIPLEXER_PIN); // look up for IMU first.
   IMU.PrintIMUData();
   Serial.println();
   Serial.print("CTWD: ");
   Serial.println(Get_CTWD());
   Serial.print("HD: ");
-  Serial.println(Get_HD());
+  Serial.println(Get_HD()); // incorrect reading, due to delta T, not real time !!
   Serial.print("Velocity: ");
-  Serial.println(Get_H_Velocity(Get_HD()));
+  Serial.println(Get_H_Velocity(Get_HD()));  // incorrect reading, due to delta T, not real time !!
   Serial.print("Calibration Data ( w, x, y, z, Pitch, Yaw , Roll, Sys, Gyro, Accel, Mag): ");
   Print_Calibration_Data();
   Serial.print("Button Status: ");
@@ -488,9 +496,15 @@ void System_Initialization(void)
   Init_All_Dist_Sensors();
   Init_Button(BUTTON_PIN);
   Init_Cali_LED(WHITE_LED);
+  Init_Servo();
   Init_timer(timer);
-  servoMotor.attach(9);
+
   (DEBUG_MODE) ?  (void) Serial.println("ALL SENSORS INITIALIZED ENTERING DEBUGGING MODE") : Print_Excel_Columns();
+}
+
+void Init_Servo(void)
+{
+    servoMotor.attach(SERVO_PIN);
 }
 
 void Init_All_Dist_Sensors(void)
@@ -577,7 +591,12 @@ float Get_CTWD(void)
     DISTANCE[i] = DIST_SENSORS[i].getDistance();
     // }
   }
-  
+
+  // please verify roll, pitch and yaw after reorientation.
+  /*
+  IMU.GetPitch(); // gets pitch
+  */
+ 
   TCA9548A(BNO055_MULTIPLEXER_PIN);
   sensors_event_t event;
   bno.getEvent(&event);
@@ -596,15 +615,16 @@ float Get_CTWD(void)
   servoMotor.write(servoAngle + ServoAngle_Compensator);
 
    
-  if(DISTANCE[0] > DISTANCE[1]){
+  if(DISTANCE[0] > DISTANCE[1])
+  {
     
     CTWD = (DISTANCE[1]+distance1_Compensator)/ sin((90-Working_Angle) * (PI / 180.0) );
 
   }
-  else if(DISTANCE[1] > DISTANCE[0]){
+  else
+  {
     
     CTWD = (DISTANCE[0]+distance0_Compensator)/ sin(Working_Angle * (PI / 180.0) );
-
   } 
    
   return Get_Displacement(CTWD, DIST_FILTER[0]);
@@ -613,7 +633,6 @@ float Get_CTWD(void)
 float Get_Displacement(float distanceSensor, EMA_Filter& DIST_FILTER)
 {
   DIST_FILTER.Insert(distanceSensor); // Insert displacement
-
   return (FILTER_READINGS) ? DIST_FILTER.Get_Filtered_Data() : DIST_FILTER.Get_Raw_Data();
 }
 
@@ -676,6 +695,7 @@ void FLASH_LED(int LED)
 
 void Auto_Calibrate(void)
 {
+  TCA9548A(BNO055_MULTIPLEXER_PIN);
  // (DEBUG_MODE) ? Serial.println("Button Interrupt Handler Accessed.") : 0;
   if(!digitalRead(BUTTON_PIN))
   {
