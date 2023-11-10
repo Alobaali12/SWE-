@@ -1,0 +1,10 @@
+SWE System Operational Procedure:
+
+STEPS:
+
+1. Calibrate the IMU (hint: LED is flashing)
+2. Follow IMU Calibration Procedure defined.
+3. Once IMU is fully calibrate, LED goes stays ON. (aka all calibration vector components are completed)
+4. Whenever you are ready, press the button.
+5. Observev: LED should go off.
+6. Begin Data Collection :)))).
